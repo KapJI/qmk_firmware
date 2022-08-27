@@ -99,6 +99,8 @@ const uint8_t PROGMEM ledmap[][DRIVER_LED_TOTAL][3] = {
 
 };
 
+const uint8_t caps_color[] = {0, 255, 255};
+
 void set_layer_color(int layer) {
   for (int i = 0; i < DRIVER_LED_TOTAL; i++) {
     HSV hsv = {
@@ -106,6 +108,14 @@ void set_layer_color(int layer) {
       .s = pgm_read_byte(&ledmap[layer][i][1]),
       .v = pgm_read_byte(&ledmap[layer][i][2]),
     };
+#ifdef CAPS_LOCK_STATUS
+    // Change just thumb cluster
+    if (keyboard_config.caps_lock_status && 32 <= i && i < DRIVER_1_LED_TOTAL) {
+      hsv.h = caps_color[0];
+      hsv.s = caps_color[1];
+      hsv.v = caps_color[2];
+    }
+#endif
     if (!hsv.h && !hsv.s && !hsv.v) {
         rgb_matrix_set_color( i, 0, 0, 0 );
     } else {
@@ -164,4 +174,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
   return true;
 }
 
+#ifdef CAPS_LOCK_STATUS
+bool led_update_user(led_t led_state) {
+  keyboard_config.caps_lock_status = led_state.caps_lock;
+  return true;
+}
+#endif
 
