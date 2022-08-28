@@ -119,7 +119,7 @@ void set_layer_color(int layer) {
     };
 #ifdef CAPS_LOCK_STATUS
     // Change just thumb cluster
-    if (keyboard_config.caps_lock_status && 32 <= i && i < DRIVER_1_LED_TOTAL) {
+    if (keyboard_config.caps_lock_status && ((32 <= i && i < DRIVER_1_LED_TOTAL) || i >= 68)) {
       hsv.h = caps_color[0];
       hsv.s = caps_color[1];
       hsv.v = caps_color[2];
