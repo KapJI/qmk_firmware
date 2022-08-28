@@ -106,7 +106,7 @@ const uint8_t caps_color[] = {0, 255, 255};
 #define GET_TAP_KC(dual_role_key) dual_role_key & 0xFF
 uint16_t last_keycode = KC_NO;
 uint8_t last_modifier = 0;
-uint16_t pressed_keycode;
+uint16_t pressed_keycode = KC_NO;
 #endif
 
 
