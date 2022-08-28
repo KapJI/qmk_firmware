@@ -50,9 +50,7 @@
 
 enum custom_keycodes {
   RGB_SLD = ML_SAFE_RANGE,
-  HSV_0_255_255,
-  HSV_86_255_128,
-  HSV_172_255_255,
+  REPEAT,
 };
 
 
@@ -64,15 +62,15 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     KC_CAPSLOCK,    KC_R,           KC_S,           KC_N,           KC_D,           KC_W,           KC_HYPR,                                                                        KC_MEH,         KC_COMMA,       KC_A,           KC_E,           KC_I,           KC_H,           MT(MOD_LGUI, KC_QUOTE),
     KC_LSHIFT,      KC_X,           KC_G,           KC_L,           KC_C,           KC_B,                                           KC_MINUS,       KC_U,           KC_O,           KC_Y,           KC_K,           KC_RSHIFT,      
     LT(1,KC_GRAVE), KC_TRANSPARENT, KC_TRANSPARENT, KC_Z,           KC_Q,           MT(MOD_LALT, KC_APPLICATION),                                                                                                MT(MOD_LCTL, KC_ESCAPE),KC_UP,          KC_DOWN,        KC_LBRACKET,    KC_RBRACKET,    MO(1),          
-    KC_LSHIFT,      KC_T,           KC_LGUI,                        KC_BSPACE,      KC_SPACE,       KC_ENTER
+    KC_LSHIFT,      KC_T,           REPEAT,                         KC_BSPACE,      KC_SPACE,       KC_ENTER
   ),
   [1] = LAYOUT_moonlander(
     KC_ESCAPE,      KC_F1,          KC_F2,          KC_F3,          KC_F4,          KC_F5,          KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_F6,          KC_F7,          KC_F8,          KC_F9,          KC_F10,         KC_F11,         
     KC_TRANSPARENT, KC_EXLM,        KC_AT,          KC_LCBR,        KC_RCBR,        KC_PIPE,        KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_UP,          KC_7,           KC_8,           KC_9,           KC_ASTR,        KC_F12,         
     KC_TRANSPARENT, KC_HASH,        KC_DLR,         KC_LPRN,        KC_RPRN,        KC_GRAVE,       KC_TRANSPARENT,                                                                 KC_TRANSPARENT, KC_DOWN,        KC_4,           KC_5,           KC_6,           KC_KP_PLUS,     KC_TRANSPARENT, 
     KC_TRANSPARENT, KC_PERC,        KC_CIRC,        KC_LBRACKET,    KC_RBRACKET,    KC_TILD,                                        KC_AMPR,        KC_1,           KC_2,           KC_3,           KC_BSLASH,      KC_TRANSPARENT, 
-    KC_TRANSPARENT, KC_COMMA,       HSV_0_255_255,  HSV_86_255_128, HSV_172_255_255,RGB_MOD,                                                                                                        RGB_TOG,        KC_TRANSPARENT, KC_DOT,         KC_0,           KC_EQUAL,       KC_TRANSPARENT, 
-    RGB_VAD,        RGB_VAI,        TOGGLE_LAYER_COLOR,                RGB_SLD,        RGB_HUD,        RGB_HUI
+    KC_TRANSPARENT, KC_COMMA,       KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, RGB_MOD,                                                                                                        RGB_TOG,        KC_TRANSPARENT, KC_DOT,         KC_0,           KC_EQUAL,       KC_TRANSPARENT,
+    RGB_VAD,        RGB_VAI,        TOGGLE_LAYER_COLOR,             RGB_SLD,        RGB_HUD,        RGB_HUI
   ),
   [2] = LAYOUT_moonlander(
     AU_TOG,         KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, RESET,          
@@ -100,6 +98,20 @@ const uint8_t PROGMEM ledmap[][DRIVER_LED_TOTAL][3] = {
 };
 
 const uint8_t caps_color[] = {0, 255, 255};
+
+#ifdef REPEAT_KEY
+// Used to extract the basic tapping keycode from a dual-role key.
+// Example: GET_TAP_KC(MT(MOD_RSFT, KC_E)) == KC_E
+#define GET_TAP_KC(dual_role_key) dual_role_key & 0xFF
+uint16_t last_keycode = KC_NO;
+uint8_t last_modifier = 0;
+
+// Initialize variables holding the bitfield
+// representation of active modifiers.
+uint8_t mod_state;
+uint8_t oneshot_mod_state;
+#endif
+
 
 void set_layer_color(int layer) {
   for (int i = 0; i < DRIVER_LED_TOTAL; i++) {
@@ -145,29 +157,59 @@ void rgb_matrix_indicators_user(void) {
   }
 }
 
+#ifdef REPEAT_KEY
+void process_repeat_key(uint16_t keycode, const keyrecord_t *record) {
+  if (keycode != REPEAT) {
+    // Early return when holding down a pure layer key
+    // to retain modifiers
+    switch (keycode) {
+      case QK_DEF_LAYER ... QK_DEF_LAYER_MAX:
+      case QK_MOMENTARY ... QK_MOMENTARY_MAX:
+      case QK_LAYER_MOD ... QK_LAYER_MOD_MAX:
+      case QK_ONE_SHOT_LAYER ... QK_ONE_SHOT_LAYER_MAX:
+      case QK_TOGGLE_LAYER ... QK_TOGGLE_LAYER_MAX:
+      case QK_TO ... QK_TO_MAX:
+      case QK_LAYER_TAP_TOGGLE ... QK_LAYER_TAP_TOGGLE_MAX:
+        return;
+    }
+    last_modifier = oneshot_mod_state > mod_state ? oneshot_mod_state : mod_state;
+    switch (keycode) {
+      case QK_LAYER_TAP ... QK_LAYER_TAP_MAX:
+      case QK_MOD_TAP ... QK_MOD_TAP_MAX:
+        if (record->event.pressed) {
+          last_keycode = GET_TAP_KC(keycode);
+        }
+        break;
+      default:
+        if (record->event.pressed) {
+          last_keycode = keycode;
+        }
+        break;
+    }
+  } else { // keycode == REPEAT
+    if (record->event.pressed) {
+      register_mods(last_modifier);
+      register_code16(last_keycode);
+    } else {
+      unregister_code16(last_keycode);
+      unregister_mods(last_modifier);
+    }
+  }
+}
+#endif
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+#ifdef REPEAT_KEY
+  process_repeat_key(keycode, record);
+  // It's important to update the mod variables *after* calling process_repeat_key, or else
+  // only a single modifier from the previous key is repeated (e.g. Ctrl+Shift+T then Repeat produces Shift+T)
+  mod_state = get_mods();
+  oneshot_mod_state = get_oneshot_mods();
+#endif
   switch (keycode) {
     case RGB_SLD:
       if (record->event.pressed) {
         rgblight_mode(1);
-      }
-      return false;
-    case HSV_0_255_255:
-      if (record->event.pressed) {
-        rgblight_mode(1);
-        rgblight_sethsv(0,255,255);
-      }
-      return false;
-    case HSV_86_255_128:
-      if (record->event.pressed) {
-        rgblight_mode(1);
-        rgblight_sethsv(86,255,128);
-      }
-      return false;
-    case HSV_172_255_255:
-      if (record->event.pressed) {
-        rgblight_mode(1);
-        rgblight_sethsv(172,255,255);
       }
       return false;
   }
