@@ -29,6 +29,7 @@
 #include "keymap_croatian.h"
 #include "keymap_turkish_q.h"
 #include "keymap_slovak.h"
+#include "print.h"
 
 #define KC_MAC_UNDO LGUI(KC_Z)
 #define KC_MAC_CUT LGUI(KC_X)
@@ -57,7 +58,7 @@ enum custom_keycodes {
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [0] = LAYOUT_moonlander(
-    KC_TRANSPARENT, KC_1,           KC_2,           KC_3,           KC_4,           KC_5,           KC_TRANSPARENT,                                 MO(2),          KC_6,           KC_7,           KC_8,           KC_9,           KC_0,           KC_TRANSPARENT, 
+    KC_LCTL,        KC_1,           KC_2,           KC_3,           KC_4,           KC_5,           KC_TRANSPARENT,                                 MO(2),          KC_6,           KC_7,           KC_8,           KC_9,           KC_0,           KC_TRANSPARENT,
     KC_TAB,         KC_J,           KC_F,           KC_M,           KC_P,           KC_V,           TG(1),                                          TG(1),          KC_EQUAL,       KC_DOT,         KC_SLASH,       KC_TRANSPARENT, KC_TRANSPARENT, KC_BSLASH,      
     KC_CAPSLOCK,    KC_R,           KC_S,           KC_N,           KC_D,           KC_W,           KC_HYPR,                                                                        KC_MEH,         KC_COMMA,       KC_A,           KC_E,           KC_I,           KC_H,           MT(MOD_LGUI, KC_QUOTE),
     KC_LSHIFT,      KC_X,           KC_G,           KC_L,           KC_C,           KC_B,                                           KC_MINUS,       KC_U,           KC_O,           KC_Y,           KC_K,           KC_RSHIFT,      
@@ -105,11 +106,7 @@ const uint8_t caps_color[] = {0, 255, 255};
 #define GET_TAP_KC(dual_role_key) dual_role_key & 0xFF
 uint16_t last_keycode = KC_NO;
 uint8_t last_modifier = 0;
-
-// Initialize variables holding the bitfield
-// representation of active modifiers.
-uint8_t mod_state;
-uint8_t oneshot_mod_state;
+uint16_t pressed_keycode;
 #endif
 
 
@@ -170,41 +167,40 @@ void process_repeat_key(uint16_t keycode, const keyrecord_t *record) {
       case QK_TOGGLE_LAYER ... QK_TOGGLE_LAYER_MAX:
       case QK_TO ... QK_TO_MAX:
       case QK_LAYER_TAP_TOGGLE ... QK_LAYER_TAP_TOGGLE_MAX:
+      case QK_MODS ... QK_MODS_MAX:
         return;
     }
-    last_modifier = oneshot_mod_state > mod_state ? oneshot_mod_state : mod_state;
-    switch (keycode) {
-      case QK_LAYER_TAP ... QK_LAYER_TAP_MAX:
-      case QK_MOD_TAP ... QK_MOD_TAP_MAX:
-        if (record->event.pressed) {
+    if (record->event.pressed) {
+      last_modifier = get_mods() | get_oneshot_mods();
+      switch (keycode) {
+        case QK_LAYER_TAP ... QK_LAYER_TAP_MAX:
+        case QK_MOD_TAP ... QK_MOD_TAP_MAX:
           last_keycode = GET_TAP_KC(keycode);
-        }
-        break;
-      default:
-        if (record->event.pressed) {
+          break;
+        default:
           last_keycode = keycode;
+          break;
         }
-        break;
     }
   } else { // keycode == REPEAT
     if (record->event.pressed) {
+      pressed_keycode = last_keycode;
       register_mods(last_modifier);
-      register_code16(last_keycode);
-    } else {
-      unregister_code16(last_keycode);
+      register_code16(pressed_keycode);
       unregister_mods(last_modifier);
+    } else {
+      unregister_code16(pressed_keycode);
     }
   }
 }
 #endif
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+#ifdef CONSOLE_ENABLE
+  uprintf("KL: kc: 0x%04X, pressed: %b, time: %u\n", keycode, record->event.pressed, record->event.time);
+#endif
 #ifdef REPEAT_KEY
   process_repeat_key(keycode, record);
-  // It's important to update the mod variables *after* calling process_repeat_key, or else
-  // only a single modifier from the previous key is repeated (e.g. Ctrl+Shift+T then Repeat produces Shift+T)
-  mod_state = get_mods();
-  oneshot_mod_state = get_oneshot_mods();
 #endif
   switch (keycode) {
     case RGB_SLD:
@@ -222,4 +218,3 @@ bool led_update_user(led_t led_state) {
   return true;
 }
 #endif
-
