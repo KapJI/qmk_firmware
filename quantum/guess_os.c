@@ -1,5 +1,10 @@
 #include "guess_os.h"
 
+#include "eeprom.h"
+#include "print.h"
+
+uint16_t usb_setups[STORED_USB_SETUPS];
+
 struct setups_data_t {
     uint8_t count;
     uint8_t cnt_02;
@@ -16,6 +21,7 @@ struct setups_data_t setups_data = {
 };
 
 void process_wlength(const uint16_t w_length) {
+    usb_setups[setups_data.count] = w_length;
     setups_data.count++;
     setups_data.last_wlength = w_length;
     if (w_length == 0x2) {
@@ -69,4 +75,20 @@ OSVariant guess_host_os(void) {
         return OS_LINUX;
     }
     return OS_UNSURE;
+}
+
+void print_all_setups(void) {
+#ifdef CONSOLE_ENABLE
+  uint8_t cnt = eeprom_read_byte(EEPROM_USER_OFFSET);
+  for (int i = 0; i < cnt; ++i) {
+    uprintf("i: %d, wLength: %X\n", i, eeprom_read_word((uint16_t *)(EEPROM_USER_OFFSET + i * 2 + 1)));
+  }
+#endif
+}
+
+void store_setups_in_eeprom(void) {
+  eeprom_update_byte(EEPROM_USER_OFFSET, setups_data.count);
+  for (int i = 0; i < setups_data.count; ++i) {
+    eeprom_update_word((uint16_t *)(EEPROM_USER_OFFSET + i * 2 + 1), usb_setups[i]);
+  }
 }

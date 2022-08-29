@@ -31,6 +31,7 @@
 #include "keymap_slovak.h"
 #include "print.h"
 #include "guess_os.h"
+#include "eeprom.h"
 
 #define KC_MAC_UNDO LGUI(KC_Z)
 #define KC_MAC_CUT LGUI(KC_X)
@@ -55,14 +56,16 @@ enum custom_keycodes {
   REPEAT,
   USR_COPY,
   USR_PASTE,
+  STORE_SETUPS,
+  PRINT_SETUPS,
 };
 
 
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [0] = LAYOUT_moonlander(
-    KC_LCTL,        KC_1,           KC_2,           KC_3,           KC_4,           KC_5,           KC_TRANSPARENT,                                 MO(2),          KC_6,           KC_7,           KC_8,           KC_9,           KC_0,           KC_TRANSPARENT,
-    KC_TAB,         KC_J,           KC_F,           KC_M,           KC_P,           KC_V,           TG(1),                                          TG(1),          KC_EQUAL,       KC_DOT,         KC_SLASH,       KC_TRANSPARENT, KC_TRANSPARENT, KC_BSLASH,      
+    STORE_SETUPS,   KC_1,           KC_2,           KC_3,           KC_4,           KC_5,           KC_TRANSPARENT,                                 MO(2),          KC_6,           KC_7,           KC_8,           KC_9,           KC_0,           KC_TRANSPARENT,
+    PRINT_SETUPS,   KC_J,           KC_F,           KC_M,           KC_P,           KC_V,           TG(1),                                          TG(1),          KC_EQUAL,       KC_DOT,         KC_SLASH,       KC_TRANSPARENT, KC_TRANSPARENT, KC_BSLASH,
     KC_CAPSLOCK,    KC_R,           KC_S,           KC_N,           KC_D,           KC_W,           KC_HYPR,                                                                        KC_MEH,         KC_COMMA,       KC_A,           KC_E,           KC_I,           KC_H,           MT(MOD_LGUI, KC_QUOTE),
     KC_LSHIFT,      KC_X,           KC_G,           KC_L,           KC_C,           KC_B,                                           KC_MINUS,       KC_U,           KC_O,           KC_Y,           KC_K,           KC_RSHIFT,      
     LT(1,KC_GRAVE), USR_COPY,       USR_PASTE,      KC_Z,           KC_Q,           MT(MOD_LALT, KC_APPLICATION),                                                                                                MT(MOD_LCTL, KC_ESCAPE),KC_UP,          KC_DOWN,        KC_LBRACKET,    KC_RBRACKET,    MO(1),
@@ -246,6 +249,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     case USR_PASTE:
       process_platform_combo(keycode, record);
       return false;
+    case STORE_SETUPS:
+      if (record->event.pressed) {
+        store_setups_in_eeprom();
+      }
+      return false;
+    case PRINT_SETUPS:
+      if (record->event.pressed) {
+        print_all_setups();
+      }
+      return false;
   }
   return true;
 }
@@ -256,3 +269,10 @@ bool led_update_user(led_t led_state) {
   return true;
 }
 #endif
+
+void eeconfig_init_user(void) {
+    eeprom_update_byte(EEPROM_USER_OFFSET, 0);
+    for (int i = 0; i < STORED_USB_SETUPS; ++i) {
+      eeprom_update_word((uint16_t *)(EEPROM_USER_OFFSET + i * 2 + 1), 0);
+    }
+}
