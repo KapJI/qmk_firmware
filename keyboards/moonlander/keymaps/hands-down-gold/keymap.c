@@ -30,6 +30,7 @@
 #include "keymap_turkish_q.h"
 #include "keymap_slovak.h"
 #include "print.h"
+#include "guess_os.h"
 
 #define KC_MAC_UNDO LGUI(KC_Z)
 #define KC_MAC_CUT LGUI(KC_X)
@@ -52,6 +53,8 @@
 enum custom_keycodes {
   RGB_SLD = ML_SAFE_RANGE,
   REPEAT,
+  USR_COPY,
+  USR_PASTE,
 };
 
 
@@ -62,7 +65,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     KC_TAB,         KC_J,           KC_F,           KC_M,           KC_P,           KC_V,           TG(1),                                          TG(1),          KC_EQUAL,       KC_DOT,         KC_SLASH,       KC_TRANSPARENT, KC_TRANSPARENT, KC_BSLASH,      
     KC_CAPSLOCK,    KC_R,           KC_S,           KC_N,           KC_D,           KC_W,           KC_HYPR,                                                                        KC_MEH,         KC_COMMA,       KC_A,           KC_E,           KC_I,           KC_H,           MT(MOD_LGUI, KC_QUOTE),
     KC_LSHIFT,      KC_X,           KC_G,           KC_L,           KC_C,           KC_B,                                           KC_MINUS,       KC_U,           KC_O,           KC_Y,           KC_K,           KC_RSHIFT,      
-    LT(1,KC_GRAVE), KC_TRANSPARENT, KC_TRANSPARENT, KC_Z,           KC_Q,           MT(MOD_LALT, KC_APPLICATION),                                                                                                MT(MOD_LCTL, KC_ESCAPE),KC_UP,          KC_DOWN,        KC_LBRACKET,    KC_RBRACKET,    MO(1),          
+    LT(1,KC_GRAVE), USR_COPY,       USR_PASTE,      KC_Z,           KC_Q,           MT(MOD_LALT, KC_APPLICATION),                                                                                                MT(MOD_LCTL, KC_ESCAPE),KC_UP,          KC_DOWN,        KC_LBRACKET,    KC_RBRACKET,    MO(1),
     KC_LSHIFT,      KC_T,           REPEAT,                         KC_BSPACE,      KC_SPACE,       KC_ENTER
   ),
   [1] = LAYOUT_moonlander(
@@ -195,6 +198,35 @@ void process_repeat_key(uint16_t keycode, const keyrecord_t *record) {
 }
 #endif
 
+void process_platform_combo(uint16_t keycode, keyrecord_t *record) {
+  uint8_t host_os = guess_host_os();
+  uint16_t keycode_to_press = KC_NO;
+  if (host_os == OS_MACOS || host_os == OS_IOS) {
+    switch (keycode) {
+      case USR_COPY:
+        keycode_to_press = G(KC_C);
+        break;
+      case USR_PASTE:
+        keycode_to_press = G(KC_V);
+        break;
+    }
+  } else {
+    switch (keycode) {
+      case USR_COPY:
+        keycode_to_press = C(KC_C);
+        break;
+      case USR_PASTE:
+        keycode_to_press = C(KC_V);
+        break;
+    }
+  }
+  if (record->event.pressed) {
+    register_code16(keycode_to_press);
+  } else {
+    unregister_code16(keycode_to_press);
+  }
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 #ifdef CONSOLE_ENABLE
   uprintf("KL: kc: 0x%04X, pressed: %b, time: %u\n", keycode, record->event.pressed, record->event.time);
@@ -207,6 +239,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
       if (record->event.pressed) {
         rgblight_mode(1);
       }
+      return false;
+    case USR_COPY:
+      process_platform_combo(keycode, record);
+      return false;
+    case USR_PASTE:
+      process_platform_combo(keycode, record);
       return false;
   }
   return true;

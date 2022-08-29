@@ -827,3 +827,5 @@ ifeq ($(strip $(BLUETOOTH_ENABLE)), yes)
         QUANTUM_LIB_SRC += uart.c
     endif
 endif
+
+SRC += $(QUANTUM_DIR)/guess_os.c

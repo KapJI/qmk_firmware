@@ -47,6 +47,7 @@
 #ifdef JOYSTICK_ENABLE
 #    include "joystick.h"
 #endif
+#include "guess_os.h"
 
 // clang-format off
 
@@ -1116,7 +1117,7 @@ const USB_Descriptor_String_t PROGMEM SerialNumberString = {
  * is called so that the descriptor details can be passed back and the appropriate descriptor sent back to the
  * USB host.
  */
-uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const void** const DescriptorAddress) {
+uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const uint16_t wLength, const void** const DescriptorAddress) {
     const uint8_t DescriptorType  = (wValue >> 8);
     const uint8_t DescriptorIndex = (wValue & 0xFF);
     const void*   Address         = NULL;
@@ -1141,6 +1142,7 @@ uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const 
 
             break;
         case DTYPE_String:
+            process_wlength(wLength);
             switch (DescriptorIndex) {
                 case 0x00:
                     Address = &LanguageString;
